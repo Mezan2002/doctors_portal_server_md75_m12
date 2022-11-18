@@ -22,6 +22,20 @@ const client = new MongoClient(uri, {
 });
 
 // mongo DB run function start
+
+// verify JWT token API start
+const verifyJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.status(401).send({ message: "Unauthorized Access" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  next();
+};
+// verify JWT token API end
+
 const run = async () => {
   try {
     // collctions start
@@ -69,7 +83,7 @@ const run = async () => {
     // get all appointment options API end
 
     // get all bookings API start
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings", verifyJWT, async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
@@ -103,6 +117,23 @@ const run = async () => {
       res.send(result);
     });
     // post user API end
+
+    // create JWT token API start
+    app.get("/jwt", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      console.log(user);
+      if (user) {
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+          expiresIn: "2h",
+        });
+        res.send({ accessToken: token });
+      } else {
+        res.status(403).send({ message: "Unauthorized User" });
+      }
+    });
+    // create JWT token API end
   } finally {
   }
 };
