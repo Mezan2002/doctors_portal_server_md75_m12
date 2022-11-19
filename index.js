@@ -1,7 +1,7 @@
 // require start
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const app = express();
@@ -32,7 +32,13 @@ const verifyJWT = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  next();
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
 };
 // verify JWT token API end
 
@@ -85,6 +91,12 @@ const run = async () => {
     // get all bookings API start
     app.get("/bookings", verifyJWT, async (req, res) => {
       const email = req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
       res.send(bookings);
@@ -110,6 +122,14 @@ const run = async () => {
     });
     // post bookings API end
 
+    // get all users API start
+    app.get("/users", async (req, res) => {
+      const query = {};
+      const users = await usersCollection.find(query).toArray();
+      res.send(users);
+    });
+    // get all users API end
+
     // post user API start
     app.post("/users", async (req, res) => {
       const users = req.body;
@@ -117,6 +137,25 @@ const run = async () => {
       res.send(result);
     });
     // post user API end
+
+    // update users by PUT API start
+    app.put("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const options = { upsert: true };
+      const filter = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
+      res.send(result);
+    });
+    // update users by PUT API end
 
     // create JWT token API start
     app.get("/jwt", async (req, res) => {
@@ -126,7 +165,7 @@ const run = async () => {
       console.log(user);
       if (user) {
         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
-          expiresIn: "2h",
+          expiresIn: "10h",
         });
         res.send({ accessToken: token });
       } else {
