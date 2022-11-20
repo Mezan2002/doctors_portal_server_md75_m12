@@ -138,8 +138,23 @@ const run = async () => {
     });
     // post user API end
 
+    // get admin users only API start
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const adminUser = await usersCollection.findOne(query);
+      res.send({ isAdmin: adminUser?.role === "admin" });
+    });
+    // get admin users only API end
+
     // update users by PUT API start
-    app.put("/users/admin/:id", async (req, res) => {
+    app.put("/users/admin/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const id = req.params.id;
       const options = { upsert: true };
       const filter = { _id: ObjectId(id) };
